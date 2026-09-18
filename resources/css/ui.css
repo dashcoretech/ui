@@ -49,6 +49,11 @@
     --dc-warning-bg: #f5eee0;
     --dc-danger-bg: #f3e7e2;
 
+    /* The drawer's backdrop. A token rather than bg-black/40, because an app
+       theme that redefines Tailwind's black (the starter's light theme does)
+       would otherwise turn it near-white. */
+    --dc-scrim: rgb(28 27 25 / 0.4);
+
     color-scheme: light;
 }
 
@@ -83,6 +88,7 @@
         --dc-success-bg: #1f241b;
         --dc-warning-bg: #2a2418;
         --dc-danger-bg: #2b1d19;
+        --dc-scrim: rgb(0 0 0 / 0.55);
 
         color-scheme: dark;
     }
@@ -108,6 +114,7 @@
     --dc-success-bg: #1f241b;
     --dc-warning-bg: #2a2418;
     --dc-danger-bg: #2b1d19;
+    --dc-scrim: rgb(0 0 0 / 0.55);
 
     color-scheme: dark;
 }
@@ -133,6 +140,7 @@
     --color-dc-success-bg: var(--dc-success-bg);
     --color-dc-warning-bg: var(--dc-warning-bg);
     --color-dc-danger-bg: var(--dc-danger-bg);
+    --color-dc-scrim: var(--dc-scrim);
 }
 
 @theme {
@@ -156,8 +164,13 @@
 @layer utilities {
     /* rounded-full is not a theme variable in v4 — it compiles to a literal —
        so the clamp above cannot reach it. Redefined here, where it wins on
-       source order. No pills. */
-    .rounded-full {
+       source order. No pills.
+
+       The exceptions are controls whose shape is their meaning: a radio is
+       round and a switch is a track with a thumb, and squaring them makes a
+       radio read as a checkbox. Flux's are exempt by their own attributes.
+       Avatars and badges are not — those are the pills this exists for. */
+    .rounded-full:not([data-flux-radio-indicator], [data-flux-radio-indicator] *, [data-flux-switch], [data-flux-switch] *) {
         border-radius: 4px;
     }
 
@@ -169,6 +182,23 @@
 
     .dc-tabular {
         font-variant-numeric: tabular-nums lining-nums;
+    }
+}
+
+/* ── Framework accents ─────────────────────────────────────────────────── */
+
+/*
+ * Flux draws its primary buttons, focus rings and checked controls from
+ * --color-accent. Pointed at the fleet accent here so a Flux app has one
+ * accent, not Flux's and ours. In the base layer, so it beats a value an app
+ * set in @theme — an app that pins Flux to its own colour is the drift this
+ * package exists to stop.
+ */
+@layer base {
+    :root {
+        --color-accent: var(--dc-accent);
+        --color-accent-content: var(--dc-accent);
+        --color-accent-foreground: var(--dc-on-accent);
     }
 }
 
@@ -211,6 +241,24 @@
         transition: color 150ms ease;
     }
 
+    /* The same entry as a button — sign out, the theme toggle — so the foot
+       of the sidebar reads as part of the list. */
+    button.dc-nav-item {
+        width: 100%;
+        background: none;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    /* A count on an entry — unread messages, open alerts. Muted and tabular:
+       it is information about the entry, not a second accent. */
+    .dc-nav-badge {
+        margin-left: auto;
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums lining-nums;
+        color: var(--dc-ink-muted);
+    }
+
     .dc-nav-item:hover {
         color: var(--dc-ink);
     }
@@ -219,6 +267,30 @@
         border-left-color: var(--dc-accent);
         color: var(--dc-accent);
         font-weight: 500;
+    }
+
+    /* Text inputs, selects and textareas: sunken, hairline, and on focus the
+       border darkens with a 1px outline — no glow ring. One class so that
+       apps stop inventing four spellings of the same focus state. */
+    .dc-input {
+        width: 100%;
+        border: 1px solid var(--dc-border);
+        border-radius: 2px;
+        background: var(--dc-sunken);
+        padding: 0.4375rem 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        color: var(--dc-ink);
+    }
+
+    .dc-input::placeholder {
+        color: var(--dc-ink-faint);
+    }
+
+    .dc-input:focus {
+        border-color: var(--dc-accent-hover);
+        outline: 1px solid var(--dc-accent-hover);
+        outline-offset: 0;
     }
 
     .dc-nav-item:focus-visible {

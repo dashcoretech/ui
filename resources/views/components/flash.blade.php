@@ -1,4 +1,8 @@
-@props(['status' => session('status')])
+@props([
+    'status' => session('status'),
+    'warning' => session('warning'),
+    'error' => session('error'),
+])
 
 @php($bag = $errors ?? null)
 
@@ -7,6 +11,18 @@
 @if ($status)
     <div class="mb-6 border-l-2 border-dc-success bg-dc-success-bg px-4 py-3 text-sm text-dc-ink" role="status" data-dc-flash="status">
         {{ $status }}
+    </div>
+@endif
+
+@if ($warning)
+    <div class="mb-6 border-l-2 border-dc-warning bg-dc-warning-bg px-4 py-3 text-sm text-dc-ink" role="status" data-dc-flash="warning">
+        {{ $warning }}
+    </div>
+@endif
+
+@if ($error)
+    <div class="mb-6 border-l-2 border-dc-danger bg-dc-danger-bg px-4 py-3 text-sm text-dc-ink" role="alert" data-dc-flash="error">
+        {{ $error }}
     </div>
 @endif
 

@@ -12,7 +12,7 @@
 ])
 
 @php
-    $entries = \Dashcore\Ui\Menu::resolve($menu);
+    $sections = \Dashcore\Ui\Menu::resolve($menu);
     $version = \Dashcore\Ui\Version::installed();
     $wire = $navigate ? 'wire:navigate' : '';
 @endphp
@@ -44,7 +44,7 @@
     </div>
 
     <label for="dc-drawer" aria-hidden="true"
-           class="fixed inset-0 z-40 hidden bg-black/40 peer-checked:block lg:peer-checked:hidden"></label>
+           class="fixed inset-0 z-40 hidden bg-dc-scrim peer-checked:block lg:peer-checked:hidden"></label>
 
     <aside class="fixed inset-y-0 left-0 z-50 flex w-60 -translate-x-full flex-col border-r border-dc-border bg-dc-surface transition-transform duration-150 peer-checked:translate-x-0 lg:translate-x-0"
            data-dc-sidebar>
@@ -60,18 +60,39 @@
         </div>
 
         <nav class="flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Main" data-dc-nav>
-            @foreach ($entries as $entry)
-                @if (isset($entry['items']))
-                    <div>
-                        <p class="dc-label mb-1.5 px-3">{{ $entry['label'] }}</p>
+            @foreach ($sections as $section)
+                @if ($section['collapsible'])
+                    {{-- A <details>, so it folds without script and a page load
+                         resets it to "open if you are in here". --}}
+                    <details class="group" @if ($section['open']) open @endif>
+                        <summary class="dc-label mb-1.5 flex cursor-pointer list-none items-center gap-1 px-3 hover:text-dc-ink">
+                            {{ $section['label'] }}
+                            <svg class="h-3 w-3 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                                <path d="m7.5 5 5 5-5 5" />
+                            </svg>
+                        </summary>
                         <div class="space-y-0.5">
-                            @foreach ($entry['items'] as $item)
+                            @foreach ($section['items'] as $item)
+                                @include('dashcore::partials.nav-item', ['item' => $item, 'wire' => $wire])
+                            @endforeach
+                        </div>
+                    </details>
+                @else
+                    <div>
+                        @if ($section['label'] !== null)
+                            <div class="mb-1.5 flex items-baseline justify-between gap-2 px-3">
+                                <p class="dc-label">{{ $section['label'] }}</p>
+                                @if ($section['link'])
+                                    <a href="{{ $section['link']['href'] }}" {{ $wire }} class="text-xs text-dc-ink-muted hover:text-dc-ink" data-dc-heading-link>{{ $section['link']['label'] }}</a>
+                                @endif
+                            </div>
+                        @endif
+                        <div class="space-y-0.5">
+                            @foreach ($section['items'] as $item)
                                 @include('dashcore::partials.nav-item', ['item' => $item, 'wire' => $wire])
                             @endforeach
                         </div>
                     </div>
-                @else
-                    @include('dashcore::partials.nav-item', ['item' => $entry, 'wire' => $wire])
                 @endif
             @endforeach
         </nav>

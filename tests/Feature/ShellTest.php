@@ -35,6 +35,82 @@ describe('the menu', function () {
     });
 });
 
+describe('sections', function () {
+    it('keeps consecutive top-level entries together as one list', function () {
+        // Three links in a row are one list, not three sections each with a
+        // section's gap above it.
+        $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
+            ['label' => 'Home', 'href' => '/'],
+            ['label' => 'Inbox', 'href' => '/inbox'],
+            ['label' => 'Senders', 'href' => '/senders'],
+            ['label' => 'Automate', 'items' => [['label' => 'Rules', 'href' => '/rules']]],
+            ['label' => 'Docs', 'href' => '/docs'],
+        ]]);
+
+        $shell = Shell::of($html);
+
+        expect($shell->count('//nav[@data-dc-nav]/*'))->toBe(3)
+            ->and($shell->count('//nav[@data-dc-nav]/div[1]//a'))->toBe(3)
+            ->and($shell->links())->toBe(['Home', 'Inbox', 'Senders', 'Rules', 'Docs']);
+    });
+
+    it('folds a collapsed section, and opens it on a page inside it', function () {
+        $menu = [['label' => 'More', 'collapsed' => true, 'items' => [
+            ['label' => 'Services', 'route' => 'services.index'],
+        ]]];
+
+        $elsewhere = Shell::of(Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => $menu]));
+
+        $this->get('/services/7');
+        $inside = Shell::of(Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => $menu]));
+
+        expect($elsewhere->count('//nav//details[not(@open)]'))->toBe(1)
+            ->and($inside->count('//nav//details[@open]'))->toBe(1)
+            ->and($inside->groups())->toBe(['More'])
+            ->and($inside->linksUnder('More'))->toBe(['Services']);
+    });
+
+    it('puts one quiet link beside a heading', function () {
+        $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
+            ['label' => 'Mailboxes', 'link' => ['label' => 'Manage', 'href' => '/mailboxes'], 'items' => [
+                ['label' => 'ops@', 'href' => '/m/1'],
+            ]],
+        ]]);
+
+        $shell = Shell::of($html);
+
+        expect($shell->count('//a[@data-dc-heading-link][@href="/mailboxes"]'))->toBe(1)
+            ->and($shell->links())->toBe(['ops@'])
+            ->and($shell->linksUnder('Mailboxes'))->toBe(['ops@']);
+    });
+
+    it('gives an entry a second line, in a tone when it is a problem', function () {
+        $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
+            ['label' => 'ops@', 'href' => '/m/1', 'hint' => 'Purpose not set', 'tone' => 'warning'],
+            ['label' => 'me@', 'href' => '/m/2', 'hint' => 'Personal', 'tone' => 'shouting'],
+        ]]);
+
+        $shell = Shell::of($html);
+
+        expect($shell->links())->toBe(['ops@', 'me@'])
+            ->and($shell->count('//*[@data-dc-nav-hint][contains(@class, "text-dc-warning")][normalize-space(.)="Purpose not set"]'))->toBe(1)
+            ->and($shell->count('//*[@data-dc-nav-hint][contains(@class, "text-dc-ink-muted")][normalize-space(.)="Personal"]'))->toBe(1);
+    });
+});
+
+describe('counts', function () {
+    it('shows a count beside an entry, and nothing for zero', function () {
+        $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
+            ['label' => 'Inbox', 'href' => '/inbox', 'badge' => 3],
+            ['label' => 'Alerts', 'href' => '/alerts', 'badge' => 0],
+            ['label' => 'Archive', 'href' => '/archive'],
+        ]]);
+
+        expect(substr_count($html, 'dc-nav-badge'))->toBe(1)
+            ->and(Shell::of($html)->count('//a[@href="/inbox"]/span[@class="dc-nav-badge"][normalize-space(.)="3"]'))->toBe(1);
+    });
+});
+
 describe('where you are', function () {
     it('marks the current page, and only it', function (string $path, string $label) {
         expect(Shell::of($this->get($path)->getContent())->active())->toBe([$label]);
@@ -125,6 +201,27 @@ describe('conformance', function () {
         expect(fn () => Shell::assertConforms($html))->toThrow(AssertionFailedError::class);
     });
 
+    it('allows the page its own navigation inside main, labelled or not', function () {
+        // Pagination labels itself; Flux's navlist on a settings page does not.
+        // Both are the page's, not a second menu.
+        $html = Blade::render('<x-dashcore::shell><nav aria-label="Pagination Navigation"><a href="?page=2">2</a></nav><nav data-flux-navlist><a href="/settings/profile">Profile</a></nav></x-dashcore::shell>');
+
+        Shell::assertConforms($html);
+
+        expect(true)->toBeTrue();
+    });
+
+    it('fails a second nav that calls itself the main menu', function () {
+        $html = Blade::render('<x-dashcore::shell><nav aria-label="Main"><a href="/">fork</a></nav></x-dashcore::shell>');
+
+        expect(fn () => Shell::assertConforms($html))->toThrow(AssertionFailedError::class);
+    });
+
+    it('says so plainly when handed an XPath that does not compile', function () {
+        expect(fn () => Shell::of('<p></p>')->count('//a[@href'))
+            ->toThrow(InvalidArgumentException::class, 'Not a valid XPath expression');
+    });
+
     it('fails a page with no shell at all', function () {
         expect(fn () => Shell::assertConforms('<html><body><nav></nav></body></html>'))
             ->toThrow(AssertionFailedError::class);
@@ -151,7 +248,43 @@ describe('the other components', function () {
         expect($html)->toContain('Saved.', 'Name is required.', 'role="alert"');
     });
 
+    it('shows a warning and an error in their own colours', function () {
+        session()->flash('warning', 'Only admins can do that.');
+        session()->flash('error', 'The sync failed.');
+
+        $html = Blade::render('<x-dashcore::flash />');
+
+        expect($html)->toContain('data-dc-flash="warning"', 'border-dc-warning', 'Only admins can do that.')
+            ->toContain('data-dc-flash="error"', 'border-dc-danger', 'The sync failed.');
+    });
+
     it('shows nothing when there is nothing to say', function () {
         expect(trim(Blade::render('<x-dashcore::flash />')))->toBe('');
+    });
+});
+
+describe('the account and theme components', function () {
+    it('puts the signed-in person above their session actions', function () {
+        $html = Blade::render('<x-dashcore::account name="Ada" email="ada@example.test"><a class="dc-nav-item" href="/profile">Profile</a></x-dashcore::account>');
+
+        expect($html)->toContain('data-dc-account', 'Ada', 'ada@example.test', 'href="/profile"');
+    });
+
+    it('leaves the email line out when there is none', function () {
+        expect(Blade::render('<x-dashcore::account name="Ada" />'))->not->toContain('text-xs');
+    });
+
+    it('renders the toggle as a nav-item button ui.js can find', function () {
+        $html = Blade::render('<x-dashcore::theme-toggle />');
+
+        expect($html)->toContain('type="button"', 'dc-nav-item', 'data-dc-theme-toggle', 'data-dc-theme-label');
+    });
+
+    it('applies a saved choice under the key the app names, defaulting as told', function () {
+        // An app moving onto the shell keeps its old key, so nobody's saved
+        // preference is lost in the move.
+        $html = Blade::render('<x-dashcore::theme-script storage-key="app-theme" default="dark" />');
+
+        expect($html)->toContain("'app-theme'", "'dark'", 'dcThemeKey');
     });
 });

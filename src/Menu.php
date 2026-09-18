@@ -16,6 +16,10 @@ use Illuminate\Support\Str;
  *
  *     ['label' => 'Overview', 'route' => 'dashboard']
  *     ['label' => 'Docs', 'href' => '/help']
+ *     ['label' => 'Inbox', 'route' => 'inbox', 'badge' => 3]                 // a count beside it
+ *     ['label' => 'ops@', 'href' => '/m/1', 'hint' => 'Purpose not set', 'tone' => 'warning']
+ *     ['label' => 'More', 'collapsed' => true, 'items' => [...]]            // folds; opens on its own pages
+ *     ['label' => 'Mailboxes', 'link' => ['label' => 'Manage', 'route' => 'mailboxes'], 'items' => [...]]
  *     ['label' => 'Fleet', 'items' => ['admin.plan' => 'Plan', ...]]        // route => label
  *     ['label' => 'Fleet', 'items' => [['label' => 'Plan', 'route' => ...]]]
  *
@@ -26,43 +30,91 @@ use Illuminate\Support\Str;
 class Menu
 {
     /**
+     * The menu as sections, in order. A heading with its entries is one
+     * section; consecutive top-level entries are gathered into one unlabelled
+     * section, so three links in a row read as a list rather than as three
+     * sections each with a gap above it.
+     *
      * @param  array<int, array<string, mixed>>  $menu
-     * @return list<array{label: string, items: list<array<string, mixed>>}|array<string, mixed>>
+     * @return list<array{label: ?string, items: list<array<string, mixed>>, collapsible: bool, open: bool, link: ?array{label: string, href: string}}>
      */
     public static function resolve(array $menu): array
     {
-        $resolved = [];
+        $sections = [];
+        $loose = [];
+
+        $flush = function () use (&$sections, &$loose) {
+            if ($loose !== []) {
+                $sections[] = ['label' => null, 'items' => $loose, 'collapsible' => false, 'open' => true, 'link' => null];
+                $loose = [];
+            }
+        };
 
         foreach ($menu as $entry) {
-            if (isset($entry['items'])) {
-                $items = [];
-
-                foreach ($entry['items'] as $key => $item) {
-                    $item = is_string($item) ? ['label' => $item, 'route' => $key] : $item;
-
-                    if (($link = self::link($item)) !== null) {
-                        $items[] = $link;
-                    }
-                }
-
-                if ($items !== []) {
-                    $resolved[] = ['label' => (string) $entry['label'], 'items' => $items];
+            if (! isset($entry['items'])) {
+                if (($link = self::link($entry)) !== null) {
+                    $loose[] = $link;
                 }
 
                 continue;
             }
 
-            if (($link = self::link($entry)) !== null) {
-                $resolved[] = $link;
+            $flush();
+
+            $items = [];
+
+            foreach ($entry['items'] as $key => $item) {
+                $item = is_string($item) ? ['label' => $item, 'route' => $key] : $item;
+
+                if (($link = self::link($item)) !== null) {
+                    $items[] = $link;
+                }
             }
+
+            if ($items === []) {
+                continue;
+            }
+
+            $current = in_array(true, array_column($items, 'active'), true);
+
+            $sections[] = [
+                'label' => (string) $entry['label'],
+                'items' => $items,
+                // A long menu can fold its less-used sections away. A folded
+                // section opens by itself when the page is inside it — a menu
+                // that hides where you are is worse than a long one.
+                'collapsible' => (bool) ($entry['collapsed'] ?? false),
+                'open' => ! ($entry['collapsed'] ?? false) || $current,
+                // One quiet link beside the heading — "Manage" beside a list of
+                // mailboxes — for the action about the section as a whole.
+                'link' => isset($entry['link']) ? self::headingLink($entry['link']) : null,
+            ];
         }
 
-        return $resolved;
+        $flush();
+
+        return $sections;
+    }
+
+    /**
+     * @param  array<string, mixed>  $link
+     * @return array{label: string, href: string}|null
+     */
+    private static function headingLink(array $link): ?array
+    {
+        if (isset($link['route']) && ! Route::has($link['route'])) {
+            return null;
+        }
+
+        return [
+            'label' => (string) $link['label'],
+            'href' => isset($link['route']) ? route($link['route'], $link['params'] ?? []) : (string) ($link['href'] ?? '#'),
+        ];
     }
 
     /**
      * @param  array<string, mixed>  $item
-     * @return array{label: string, href: string, active: bool, icon: ?string}|null
+     * @return array{label: string, href: string, active: bool, icon: ?string, badge: ?string, hint: ?string, tone: ?string}|null
      */
     private static function link(array $item): ?array
     {
@@ -81,6 +133,14 @@ class Menu
             'href' => $href,
             'active' => (bool) ($item['active'] ?? self::isActive($item, $href)),
             'icon' => $item['icon'] ?? null,
+            // A count beside the label. Zero and null render nothing: an entry
+            // showing "0" is a badge asking for attention it does not need.
+            'badge' => filled($item['badge'] ?? null) && ($item['badge'] ?? null) !== 0 ? (string) $item['badge'] : null,
+            // A second, muted line under the label — a mailbox's purpose — and
+            // an optional tone for it when it is a problem to fix rather than
+            // a description. Only the hint takes the tone; the label stays ink.
+            'hint' => filled($item['hint'] ?? null) ? (string) $item['hint'] : null,
+            'tone' => in_array($item['tone'] ?? null, ['success', 'warning', 'danger'], true) ? $item['tone'] : null,
         ];
     }
 

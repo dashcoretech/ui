@@ -4,5 +4,20 @@
             <path d="{{ $item['icon'] }}" />
         </svg>
     @endif
-    {{ $item['label'] }}
+    {{-- min-w-0 so a long label truncates instead of wrapping the sidebar. --}}
+    <span class="min-w-0 flex-1">
+        <span class="block truncate" data-dc-nav-label>{{ $item['label'] }}</span>
+        @if ($item['hint'])
+            <span @class([
+                'block truncate text-xs font-normal',
+                'text-dc-ink-muted' => $item['tone'] === null,
+                'text-dc-success' => $item['tone'] === 'success',
+                'text-dc-warning' => $item['tone'] === 'warning',
+                'text-dc-danger' => $item['tone'] === 'danger',
+            ]) data-dc-nav-hint>{{ $item['hint'] }}</span>
+        @endif
+    </span>
+    @if ($item['badge'])
+        <span class="dc-nav-badge">{{ $item['badge'] }}</span>
+    @endif
 </a>

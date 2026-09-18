@@ -33,10 +33,18 @@ numeric columns are right-aligned, and rows are at least 44px tall.
 per screen: the primary action, or the active state. Semantic colour is the
 muted set below, never traffic-light bright.
 
+The sidebar's "you are here" belongs to the frame, not the page, so it does
+not count. The rule applies to what is inside `<main>`: one primary action per
+page takes the accent, and everything else is secondary. Tabs, filters and an
+in-page list mark their current item in ink, not accent — otherwise every
+page with tabs spends the accent twice.
+
 **Sharp corners, always.** 4px is the ceiling anywhere — buttons, inputs,
-cards, badges, modals. The package clamps every `rounded-*` utility,
-`rounded-full` included, so this holds without anyone remembering it. A shape
-that truly is a circle (a status dot, a spinner) uses `dc-circle`.
+cards, badges, avatars, modals. The package clamps every `rounded-*` utility,
+`rounded-full` included, so this holds without anyone remembering it — on
+every page of the app, public ones too. A shape that truly is a circle (a
+status dot, a spinner, a chart legend key) uses `dc-circle`; radios and
+switches keep their round shape because the shape is what they mean.
 
 ## Tokens
 
@@ -61,6 +69,7 @@ correct in both colour schemes, so no view writes a `dark:` variant for one.
 | `dc-success` / `-bg` | `#5b6e4f` / `#eef0e8` | `#9db08c` / `#1f241b` | muted olive |
 | `dc-warning` / `-bg` | `#9c7a3d` / `#f5eee0` | `#d1ae6e` / `#2a2418` | muted ochre |
 | `dc-danger` / `-bg` | `#8c4a3d` / `#f3e7e2` | `#cf8b7c` / `#2b1d19` | muted brick |
+| `dc-scrim` | ink at 40% | black at 55% | the backdrop behind an open drawer or modal |
 
 **Dark mode** follows the OS by default. An app that offers a switch sets
 `class="dark"` / `class="light"` or `data-theme="dark|light"` on `<html>`; all
@@ -118,10 +127,39 @@ rule and no fill. No zebra stripes unless the table is very dense, and then
 `bg-dc-sunken` rather than lines. Numeric columns right-aligned, `dc-tabular`.
 
 **Status tags.** Not pills. `rounded-xs px-2 py-0.5`, a 2px left border in the
-semantic colour, the `-bg` tint behind, text in the full semantic colour.
+semantic colour, the `-bg` tint behind, text in the full semantic colour. A
+neutral, informational tag has no semantic colour: a `dc-metal` rule on
+`dc-sunken`, text in `dc-ink-muted`.
 
-**Inputs.** `bg-dc-sunken border border-dc-border rounded-xs`; focus moves the
-border to `dc-accent-hover` with a 1px outline — no glow ring.
+**Destructive actions.** An outline in `dc-danger` (`border border-dc-danger
+text-dc-danger hover:bg-dc-danger-bg`), never a solid red fill. A destructive
+action is never the page's primary one; if it has to be, the page is asking
+the wrong question.
+
+**Inputs.** `dc-input` on text inputs, selects and textareas — sunken, a
+hairline, and on focus a darker border with a 1px outline, no glow ring.
+Checkboxes and radios take `accent-dc-ink`, so they are not browser blue.
+Form labels are `dc-label`.
+
+**Tabs and in-page navigation.** The current tab is `text-dc-ink` with a 2px
+bottom border in `dc-ink`; the rest are `text-dc-ink-muted`. An in-page list
+of links — a guide's table of contents — is a `<nav>` with its own
+`aria-label` ("Guides", "Sections"), so it is never mistaken for a second
+main menu.
+
+**Figures.** A stat's number is Inter `text-2xl font-medium dc-tabular`; its
+caption is `dc-label`. Before reaching for a stat tile, check whether a table
+row or a sentence would say it better.
+
+**Code and command output.** `bg-dc-sunken text-dc-ink font-mono text-[13px]`,
+a hairline border, `rounded-sm`. Not a black terminal block — that is the
+loudest thing on any page it appears on.
+
+**Charts and SVG.** Colour marks with the token utilities — `stroke-dc-danger`,
+`fill-dc-ink-muted` — so they switch with the scheme. Where a class cannot
+reach, use `style="stroke: var(--dc-danger)"`; never a hex value, and never a
+presentation attribute (`stroke="…"`) with `var()` in it, which some renderers
+ignore.
 
 **Flash messages.** `<x-dashcore::flash />` — the status-tag treatment at page
 width.
