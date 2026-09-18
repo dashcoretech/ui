@@ -1,0 +1,39 @@
+{
+    "name": "dashcore/ui",
+    "description": "The Dashcore fleet's shared look: design tokens, the application shell, and the rules that govern both. One package, so every app looks like one product and a design change is a release rather than an edit in every repository.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "laravel/framework": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^4.0|^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dashcore\\Ui\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dashcore\\Ui\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Dashcore\\Ui\\UiServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    }
+}
