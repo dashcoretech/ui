@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
  *     ['label' => 'Overview', 'route' => 'dashboard']
  *     ['label' => 'Docs', 'href' => '/help']
  *     ['label' => 'Inbox', 'route' => 'inbox', 'badge' => 3]                 // a count beside it
+ *     ['label' => 'Team', 'route' => 'team', 'icon' => ['M15 19…', 'M12 6…']] // one path's d, or several
  *     ['label' => 'ops@', 'href' => '/m/1', 'hint' => 'Purpose not set', 'tone' => 'warning']
  *     ['label' => 'More', 'collapsed' => true, 'items' => [...]]            // folds; opens on its own pages
  *     ['label' => 'Mailboxes', 'link' => ['label' => 'Manage', 'route' => 'mailboxes'], 'items' => [...]]
@@ -75,8 +76,6 @@ class Menu
                 continue;
             }
 
-            $current = in_array(true, array_column($items, 'active'), true);
-
             $sections[] = [
                 'label' => (string) $entry['label'],
                 'items' => $items,
@@ -84,7 +83,7 @@ class Menu
                 // section opens by itself when the page is inside it — a menu
                 // that hides where you are is worse than a long one.
                 'collapsible' => (bool) ($entry['collapsed'] ?? false),
-                'open' => ! ($entry['collapsed'] ?? false) || $current,
+                'open' => true,
                 // One quiet link beside the heading — "Manage" beside a list of
                 // mailboxes — for the action about the section as a whole.
                 'link' => isset($entry['link']) ? self::headingLink($entry['link']) : null,
@@ -92,6 +91,40 @@ class Menu
         }
 
         $flush();
+
+        return self::settle($sections);
+    }
+
+    /**
+     * Leaves only the most specific of the entries the default rule lit.
+     *
+     * The prefix rule lights `leads` on the Pipeline board as well as
+     * `leads.board`, and `pto.index` on `pto.my` as well as `pto.my`. Of the
+     * entries that matched only by that rule, the one with the most route-name
+     * or path segments is where you are; the rest were matching as its
+     * parents. An entry lit by `active` or `match` is the app speaking, and is
+     * left as it said. Then each folded section opens if it holds the page.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    private static function settle(array $sections): array
+    {
+        $best = max([0, ...array_filter(array_column(array_merge(...array_column($sections, 'items')), 'depth'))]);
+
+        foreach ($sections as &$section) {
+            foreach ($section['items'] as &$item) {
+                if ($item['depth'] !== null && $item['depth'] < $best) {
+                    $item['active'] = false;
+                }
+
+                unset($item['depth']);
+            }
+
+            unset($item);
+
+            $section['open'] = ! $section['collapsible'] || in_array(true, array_column($section['items'], 'active'), true);
+        }
 
         return $sections;
     }
@@ -114,7 +147,7 @@ class Menu
 
     /**
      * @param  array<string, mixed>  $item
-     * @return array{label: string, href: string, active: bool, icon: ?string, badge: ?string, hint: ?string, tone: ?string}|null
+     * @return array{label: string, href: string, active: bool, depth: ?int, icon: string|list<string>|null, badge: ?string, hint: ?string, tone: ?string}|null
      */
     private static function link(array $item): ?array
     {
@@ -128,10 +161,18 @@ class Menu
             $href = (string) ($item['href'] ?? '#');
         }
 
+        $explicit = isset($item['active']) || isset($item['match']);
+        $depth = $explicit ? null : self::depth($item, $href);
+
         return [
             'label' => (string) $item['label'],
             'href' => $href,
-            'active' => (bool) ($item['active'] ?? self::isActive($item, $href)),
+            'active' => (bool) ($item['active'] ?? ($explicit ? self::matches($item) : $depth !== null)),
+            // How specific a default-rule match was, for settle(); null when
+            // the entry is not lit, or was lit by the app's own say-so.
+            'depth' => $depth,
+            // One path's `d`, or a list of them: many heroicons are several
+            // paths, and joining them into one string is easy to get wrong.
             'icon' => $item['icon'] ?? null,
             // A count beside the label. Zero and null render nothing: an entry
             // showing "0" is a badge asking for attention it does not need.
@@ -145,33 +186,46 @@ class Menu
     }
 
     /**
-     * Whether the current request falls under this entry.
-     *
-     * By route-name prefix when the entry names a route, so a show page lights
-     * its own index; by path prefix otherwise. `match` overrides both with a
-     * route pattern (or list of them) for the entry that fronts a section
-     * whose routes are not named after it.
+     * Whether the current request falls under this entry's `match`: a route
+     * pattern (or list of them) for the entry that fronts a section whose
+     * routes are not named after it.
      *
      * @param  array<string, mixed>  $item
      */
-    private static function isActive(array $item, string $href): bool
+    private static function matches(array $item): bool
+    {
+        return isset($item['match']) && request()->routeIs(...(array) $item['match']);
+    }
+
+    /**
+     * Whether the current request falls under this entry by the default rule,
+     * and if so how specifically: the number of segments that matched.
+     *
+     * By route-name prefix when the entry names a route, so a show page lights
+     * its own index (`services.index` covers `services` and `services.*`); by
+     * path prefix otherwise. Both stop at a segment boundary, so `leads` does
+     * not light on `leadsources`.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private static function depth(array $item, string $href): ?int
     {
         $request = request();
 
-        if (isset($item['match'])) {
-            return $request->routeIs(...(array) $item['match']);
-        }
-
         if (isset($item['route'])) {
-            return $request->routeIs(Str::before($item['route'], '.index').'*');
+            $stem = Str::replaceEnd('.index', '', $item['route']);
+
+            return $request->routeIs($stem, $stem.'.*') ? substr_count($stem, '.') + 1 : null;
         }
 
         $path = trim((string) parse_url($href, PHP_URL_PATH), '/');
 
         // The root would prefix-match every page in the app, so it only
         // lights for itself.
-        return $path === ''
-            ? $request->path() === '/'
-            : $request->is($path, $path.'/*');
+        if ($path === '') {
+            return $request->path() === '/' ? 1 : null;
+        }
+
+        return $request->is($path, $path.'/*') ? substr_count($path, '/') + 1 : null;
     }
 }
