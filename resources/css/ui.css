@@ -293,6 +293,31 @@
         outline-offset: 0;
     }
 
+    /* The theme toggle's two labels: it names where it will go. */
+    .dc-theme-to-light {
+        display: none;
+    }
+
+    :root.dark .dc-theme-to-dark,
+    :root[data-theme='dark'] .dc-theme-to-dark {
+        display: none;
+    }
+
+    :root.dark .dc-theme-to-light,
+    :root[data-theme='dark'] .dc-theme-to-light {
+        display: inline;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root:not(.light):not([data-theme='light']) .dc-theme-to-dark {
+            display: none;
+        }
+
+        :root:not(.light):not([data-theme='light']) .dc-theme-to-light {
+            display: inline;
+        }
+    }
+
     .dc-nav-item:focus-visible {
         outline: 1px solid var(--dc-accent);
         outline-offset: -1px;

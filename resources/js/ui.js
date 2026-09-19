@@ -21,25 +21,36 @@ document.addEventListener('keydown', (event) => {
 // script recorded, and keeps each toggle's label naming where it will go.
 const root = document.documentElement;
 
-// Read once, at load. wire:navigate copies the next page's <html> attributes
-// over the live ones — which strips both the theme class and these data
-// attributes — so they are captured here and re-applied after every swap.
-const themeKey = root.dataset.dcThemeKey || 'dc-theme';
-const themeDefault = root.dataset.dcThemeDefault || 'system';
+// The key and default come from the <x-dashcore::theme-script> tag on the
+// current page, read fresh every time. wire:navigate copies the next page's
+// <html> attributes over the live ones, so nothing stored there survives a
+// swap, and a value captured once at load is wrong whenever the visit began on
+// a page without the tag.
+const themeConfig = () => {
+    const tag = document.querySelector('script[data-dc-theme-key]');
 
-const stored = () => {
+    return {
+        key: tag?.dataset.dcThemeKey || 'dc-theme',
+        fallback: tag?.dataset.dcThemeDefault || 'system',
+        present: tag !== null,
+    };
+};
+
+const stored = (key) => {
     try {
-        return localStorage.getItem(themeKey);
+        return localStorage.getItem(key);
     } catch (e) {
         return null;
     }
 };
 
 const applyTheme = () => {
-    const theme = stored() || themeDefault;
+    const { key, fallback, present } = themeConfig();
 
-    root.dataset.dcThemeKey = themeKey;
-    root.dataset.dcThemeDefault = themeDefault;
+    // A page with no theme-script has no switch to honour; leave it alone.
+    if (!present) return;
+
+    const theme = stored(key) || fallback;
 
     if (theme === 'dark' || theme === 'light') {
         root.classList.remove('dark', 'light');
@@ -56,13 +67,12 @@ const isDark = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 };
 
+// The visible label is chosen by CSS from the <html> class, so it is right
+// before this script loads; this keeps the pressed state in step for
+// assistive tech.
 const labelToggles = () => {
     document.querySelectorAll('[data-dc-theme-toggle]').forEach((button) => {
         button.setAttribute('aria-pressed', String(isDark()));
-
-        const label = button.querySelector('[data-dc-theme-label]');
-
-        if (label) label.textContent = isDark() ? 'Light mode' : 'Dark mode';
     });
 };
 
@@ -77,7 +87,7 @@ document.addEventListener('click', (event) => {
     if (root.hasAttribute('data-theme')) root.dataset.theme = next;
 
     try {
-        localStorage.setItem(themeKey, next);
+        localStorage.setItem(themeConfig().key, next);
     } catch (e) {}
 
     labelToggles();

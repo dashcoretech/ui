@@ -280,11 +280,18 @@ describe('the account and theme components', function () {
         expect($html)->toContain('type="button"', 'dc-nav-item', 'data-dc-theme-toggle', 'data-dc-theme-label');
     });
 
+    it('carries both labels, so CSS can name the right one before any script runs', function () {
+        $html = Blade::render('<x-dashcore::theme-toggle />');
+
+        expect($html)->toContain('dc-theme-to-dark', 'Dark mode', 'dc-theme-to-light', 'Light mode');
+    });
+
     it('applies a saved choice under the key the app names, defaulting as told', function () {
         // An app moving onto the shell keeps its old key, so nobody's saved
         // preference is lost in the move.
         $html = Blade::render('<x-dashcore::theme-script storage-key="app-theme" default="dark" />');
 
-        expect($html)->toContain("'app-theme'", "'dark'", 'dcThemeKey');
+        expect($html)->toContain("'app-theme'", "'dark'")
+            ->toContain('data-dc-theme-key="app-theme"', 'data-dc-theme-default="dark"');
     });
 });
