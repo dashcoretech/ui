@@ -17,8 +17,9 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * A small app: an index with a show page under it, a second section, and
-     * a page that renders the shell with whatever menu the test hands it.
+     * A small app: an index with a show page under it, a second section, some
+     * siblings, and a page that renders the shell with whatever menu the test
+     * hands it.
      */
     protected function defineRoutes($router): void
     {
@@ -32,6 +33,17 @@ abstract class TestCase extends Orchestra
         Route::get('/services/{id}', $page)->name('services.show');
         Route::get('/audit', $page)->name('audit.index');
         Route::get('/help', $page);
+
+        // Siblings, for the most-specific rule: an entry named without
+        // .index beside one of its own children (sales), and an .index beside
+        // a sibling that is its own entry (hr).
+        Route::get('/leads', $page)->name('leads');
+        Route::get('/leads/board', $page)->name('leads.board');
+        Route::get('/leads/{id}', $page)->name('leads.show');
+        Route::get('/lead-sources', $page)->name('leadsources.index');
+        Route::get('/pto', $page)->name('pto.index');
+        Route::get('/pto/mine', $page)->name('pto.my');
+        Route::get('/pto/{id}', $page)->name('pto.show');
     }
 
     protected function defineEnvironment($app): void

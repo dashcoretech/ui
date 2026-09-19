@@ -44,7 +44,8 @@ cards, badges, avatars, modals. The package clamps every `rounded-*` utility,
 `rounded-full` included, so this holds without anyone remembering it — on
 every page of the app, public ones too. A shape that truly is a circle (a
 status dot, a spinner, a chart legend key) uses `dc-circle`; radios and
-switches keep their round shape because the shape is what they mean.
+switches (`dc-switch`, anything with `role="switch"`) keep their round shape
+because the shape is what they mean.
 
 ## Tokens
 
@@ -73,7 +74,9 @@ correct in both colour schemes, so no view writes a `dark:` variant for one.
 
 **Dark mode** follows the OS by default. An app that offers a switch sets
 `class="dark"` / `class="light"` or `data-theme="dark|light"` on `<html>`; all
-three are honoured, and an explicit light choice beats the OS.
+three are honoured, and an explicit light choice beats the OS. The package's
+`dark:` variant reads the same three, so where an app does need a `dark:`
+utility (a colour that is not a token), it agrees with the tokens.
 
 ## Type
 
@@ -116,9 +119,12 @@ once and released to everyone. An override in one app is a fork nobody sees.
 
 **Buttons.** Primary: `bg-dc-accent text-dc-on-accent hover:bg-dc-accent-hover`,
 `rounded-sm`, no shadow. Secondary: transparent, `border border-dc-border-strong
-text-dc-ink`. Never a gradient; hover shifts colour, never adds a glow.
+text-dc-ink`. Ghost: no border, muted ink. Never a gradient; hover shifts
+colour, never adds a glow. `<x-dashcore::button>`, or `dc-btn` with
+`dc-btn-primary` / `-secondary` / `-danger` / `-ghost`.
 
-**Panels.** `bg-dc-surface border border-dc-border rounded-md`, no shadow. Keep
+**Panels.** `bg-dc-surface border border-dc-border rounded-md`, no shadow
+(`dc-panel`). Keep
 the panel treatment for content that is genuinely a unit — flat sections
 divided by hairlines are the default, not card soup.
 
@@ -129,7 +135,10 @@ rule and no fill. No zebra stripes unless the table is very dense, and then
 **Status tags.** Not pills. `rounded-xs px-2 py-0.5`, a 2px left border in the
 semantic colour, the `-bg` tint behind, text in the full semantic colour. A
 neutral, informational tag has no semantic colour: a `dc-metal` rule on
-`dc-sunken`, text in `dc-ink-muted`.
+`dc-sunken`, text in `dc-ink-muted`. There is no info colour; neutral is it.
+`<x-dashcore::tag>`, or `dc-tag` with `dc-tag-success` / `-warning` /
+`-danger`. A callout (`<x-dashcore::callout>`) is the same treatment at the
+width of its content.
 
 **Destructive actions.** An outline in `dc-danger` (`border border-dc-danger
 text-dc-danger hover:bg-dc-danger-bg`), never a solid red fill. A destructive
@@ -139,13 +148,23 @@ the wrong question.
 **Inputs.** `dc-input` on text inputs, selects and textareas — sunken, a
 hairline, and on focus a darker border with a 1px outline, no glow ring.
 Checkboxes and radios take `accent-dc-ink`, so they are not browser blue.
-Form labels are `dc-label`.
+Form labels are `dc-label`; a field's error is one `text-xs text-dc-danger`
+line under it, and replaces its hint. `<x-dashcore::input>` and its siblings
+draw all of this.
+
+**Switches.** A checkbox with `role="switch"`, drawn as a track by
+`dc-switch`: ink when on. For a setting that takes effect at once; in a form
+with a Save button, a checkbox says it better.
+
+**Modals.** A native `<dialog>` (`<x-dashcore::modal>`): a panel on
+`dc-scrim`, a section title, the actions bottom-right. One primary action at
+most, and a destructive one is the danger outline.
 
 **Tabs and in-page navigation.** The current tab is `text-dc-ink` with a 2px
 bottom border in `dc-ink`; the rest are `text-dc-ink-muted`. An in-page list
 of links — a guide's table of contents — is a `<nav>` with its own
 `aria-label` ("Guides", "Sections"), so it is never mistaken for a second
-main menu.
+main menu. `<x-dashcore::tabs>` is both.
 
 **Figures.** A stat's number is Inter `text-2xl font-medium dc-tabular`; its
 caption is `dc-label`. Before reaching for a stat tile, check whether a table

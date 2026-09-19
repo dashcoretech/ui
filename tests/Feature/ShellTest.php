@@ -98,6 +98,23 @@ describe('sections', function () {
     });
 });
 
+describe('icons', function () {
+    it('draws one path, or one per entry in a list', function () {
+        $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
+            ['label' => 'One', 'href' => '/one', 'icon' => 'M3 3v18h18'],
+            ['label' => 'Two', 'href' => '/two', 'icon' => ['M15 12a3 3 0 1 1-6 0', 'M2 12s4-7 10-7 10 7 10 7']],
+            ['label' => 'None', 'href' => '/none'],
+        ]]);
+
+        $shell = Shell::of($html);
+
+        expect($shell->count('//a[@href="/one"]/svg/path'))->toBe(1)
+            ->and($shell->count('//a[@href="/two"]/svg/path'))->toBe(2)
+            ->and($shell->count('//a[@href="/two"]/svg/path[@d="M2 12s4-7 10-7 10 7 10 7"]'))->toBe(1)
+            ->and($shell->count('//a[@href="/none"]/svg'))->toBe(0);
+    });
+});
+
 describe('counts', function () {
     it('shows a count beside an entry, and nothing for zero', function () {
         $html = Blade::render('<x-dashcore::shell :menu="$menu" />', ['menu' => [
@@ -124,6 +141,71 @@ describe('where you are', function () {
     it('keeps an index lit on the pages beneath it', function () {
         // By route-name prefix: services.show lights services.index.
         expect(Shell::of($this->get('/services/7')->getContent())->active())->toBe(['Services']);
+    });
+
+    it('lights only the most specific of the entries the prefix rule matches', function (array $menu, string $path, array $lit) {
+        app()->instance('test.menu', $menu);
+
+        expect(Shell::of($this->get($path)->getContent())->active())->toBe($lit);
+    })->with([
+        // `leads` prefixes `leads.board`; the board is its own entry.
+        'a child that is its own entry' => [[
+            ['label' => 'Leads', 'route' => 'leads'],
+            ['label' => 'Pipeline', 'route' => 'leads.board'],
+        ], '/leads/board', ['Pipeline']],
+        'the parent on a page no entry names' => [[
+            ['label' => 'Leads', 'route' => 'leads'],
+            ['label' => 'Pipeline', 'route' => 'leads.board'],
+        ], '/leads/7', ['Leads']],
+        // `pto.index` covers every pto.* page except the ones with their own entry.
+        'an index beside a sibling' => [[
+            ['label' => 'PTO', 'items' => ['pto.index' => 'Requests', 'pto.my' => 'My time off']],
+        ], '/pto/mine', ['My time off']],
+        'the index on its own page' => [[
+            ['label' => 'PTO', 'items' => ['pto.index' => 'Requests', 'pto.my' => 'My time off']],
+        ], '/pto', ['Requests']],
+        'the index on a page beneath it' => [[
+            ['label' => 'PTO', 'items' => ['pto.index' => 'Requests', 'pto.my' => 'My time off']],
+        ], '/pto/3', ['Requests']],
+        // The same route in two places is equally specific in both.
+        'one route in two sections' => [[
+            ['label' => 'Mine', 'items' => ['pto.my' => 'My time off']],
+            ['label' => 'PTO', 'items' => ['pto.index' => 'Requests', 'pto.my' => 'Yours']],
+        ], '/pto/mine', ['My time off', 'Yours']],
+        'across sections, by path as well as by route' => [[
+            ['label' => 'Leads', 'route' => 'leads'],
+            ['label' => 'Views', 'items' => [['label' => 'Board', 'href' => '/leads/board']]],
+        ], '/leads/board', ['Board']],
+        // A prefix stops at a segment boundary.
+        'not a longer name that merely starts the same' => [[
+            ['label' => 'Leads', 'route' => 'leads'],
+        ], '/lead-sources', []],
+    ]);
+
+    it('leaves an entry lit by match or active alone', function () {
+        // The app has spoken: `match` and `active` keep their meaning, and
+        // neither dims the other nor is dimmed by a more specific default.
+        app()->instance('test.menu', [
+            ['label' => 'Everything', 'route' => 'home', 'match' => 'leads*'],
+            ['label' => 'Leads', 'route' => 'leads'],
+            ['label' => 'Pipeline', 'route' => 'leads.board'],
+            ['label' => 'Pinned', 'href' => '/x', 'active' => true],
+        ]);
+
+        expect(Shell::of($this->get('/leads/board')->getContent())->active())->toBe(['Everything', 'Pipeline', 'Pinned']);
+    });
+
+    it('opens a folded section only when its entry is the one that stays lit', function () {
+        app()->instance('test.menu', [
+            ['label' => 'Leads', 'route' => 'leads'],
+            ['label' => 'More', 'collapsed' => true, 'items' => [['label' => 'All leads', 'route' => 'leads']]],
+            ['label' => 'Board', 'items' => [['label' => 'Pipeline', 'route' => 'leads.board']]],
+        ]);
+
+        $shell = Shell::of($this->get('/leads/board')->getContent());
+
+        expect($shell->count('//nav//details[not(@open)]'))->toBe(1)
+            ->and($shell->active())->toBe(['Pipeline']);
     });
 
     it('lets an app say outright which entry is current', function () {
@@ -256,6 +338,50 @@ describe('the other components', function () {
 
         expect($html)->toContain('data-dc-flash="warning"', 'border-dc-warning', 'Only admins can do that.')
             ->toContain('data-dc-flash="error"', 'border-dc-danger', 'The sync failed.');
+    });
+
+    it('treats a flashed success as success, beside status', function () {
+        session()->flash('status', 'Saved.');
+        session()->flash('success', 'Invite sent.');
+
+        $html = Blade::render('<x-dashcore::flash />');
+
+        expect($html)->toContain('data-dc-flash="status"', 'Saved.', 'data-dc-flash="success"', 'Invite sent.')
+            ->and(substr_count($html, 'border-dc-success'))->toBe(2);
+    });
+
+    it('says a message once when status and success agree', function () {
+        session()->flash('status', 'Saved.');
+        session()->flash('success', 'Saved.');
+
+        expect(substr_count(Blade::render('<x-dashcore::flash />'), 'Saved.'))->toBe(1);
+    });
+
+    it('does not print a status code, unless the app words it', function () {
+        // Fortify flashes codes for the page that set them to word itself.
+        session()->flash('status', 'verification-link-sent');
+
+        expect(trim(Blade::render('<x-dashcore::flash />')))->toBe('');
+
+        app('translator')->addLines(['*.profile-updated' => 'Profile saved.'], 'en');
+        session()->flash('status', 'profile-updated');
+
+        expect(Blade::render('<x-dashcore::flash />'))->toContain('Profile saved.')->not->toContain('profile-updated');
+    });
+
+    it('leaves a sentence alone, however short', function () {
+        session()->flash('status', 'saved');
+
+        expect(Blade::render('<x-dashcore::flash />'))->toContain('saved');
+    });
+
+    it('leaves the validation errors to the form when told to', function () {
+        session()->flash('status', 'Saved.');
+        view()->share('errors', (new ViewErrorBag)->put('default', new MessageBag(['name' => 'Name is required.'])));
+
+        $html = Blade::render('<x-dashcore::flash :errors="false" />');
+
+        expect($html)->toContain('Saved.')->not->toContain('Name is required.');
     });
 
     it('shows nothing when there is nothing to say', function () {
