@@ -10,14 +10,15 @@
      dark/light class on <html>, which is what the tokens read. Inline and
      synchronous on purpose — run any later and a dark-mode user sees a white
      flash on every page load. --}}
-<script>
+{{-- The key and default ride on the tag itself, server-rendered, so ui.js can
+     read them from whichever page is current. Captured once from the first
+     page instead, a visit that began on a page without this tag (a login
+     screen) would keep the wrong key for the rest of the session. --}}
+<script data-dc-theme-key="{{ $storageKey }}" data-dc-theme-default="{{ $default }}">
     (() => {
         const root = document.documentElement;
         const key = @js($storageKey);
         let theme = null;
-
-        root.dataset.dcThemeKey = key;
-        root.dataset.dcThemeDefault = @js($default);
 
         try {
             theme = localStorage.getItem(key);
