@@ -340,6 +340,50 @@ describe('the other components', function () {
             ->toContain('data-dc-flash="error"', 'border-dc-danger', 'The sync failed.');
     });
 
+    it('treats a flashed success as success, beside status', function () {
+        session()->flash('status', 'Saved.');
+        session()->flash('success', 'Invite sent.');
+
+        $html = Blade::render('<x-dashcore::flash />');
+
+        expect($html)->toContain('data-dc-flash="status"', 'Saved.', 'data-dc-flash="success"', 'Invite sent.')
+            ->and(substr_count($html, 'border-dc-success'))->toBe(2);
+    });
+
+    it('says a message once when status and success agree', function () {
+        session()->flash('status', 'Saved.');
+        session()->flash('success', 'Saved.');
+
+        expect(substr_count(Blade::render('<x-dashcore::flash />'), 'Saved.'))->toBe(1);
+    });
+
+    it('does not print a status code, unless the app words it', function () {
+        // Fortify flashes codes for the page that set them to word itself.
+        session()->flash('status', 'verification-link-sent');
+
+        expect(trim(Blade::render('<x-dashcore::flash />')))->toBe('');
+
+        app('translator')->addLines(['*.profile-updated' => 'Profile saved.'], 'en');
+        session()->flash('status', 'profile-updated');
+
+        expect(Blade::render('<x-dashcore::flash />'))->toContain('Profile saved.')->not->toContain('profile-updated');
+    });
+
+    it('leaves a sentence alone, however short', function () {
+        session()->flash('status', 'saved');
+
+        expect(Blade::render('<x-dashcore::flash />'))->toContain('saved');
+    });
+
+    it('leaves the validation errors to the form when told to', function () {
+        session()->flash('status', 'Saved.');
+        view()->share('errors', (new ViewErrorBag)->put('default', new MessageBag(['name' => 'Name is required.'])));
+
+        $html = Blade::render('<x-dashcore::flash :errors="false" />');
+
+        expect($html)->toContain('Saved.')->not->toContain('Name is required.');
+    });
+
     it('shows nothing when there is nothing to say', function () {
         expect(trim(Blade::render('<x-dashcore::flash />')))->toBe('');
     });
